@@ -146,58 +146,173 @@
         </div>
 
 	<div class="tabela-container" id="tabelaConteiner">
-	     <div class="status" id="mensagemStatus">Clique em um dos botões de dados para visualizar uma tabela.</div>
+	     <div class="status" id="mensagemStatus">Clique em um dos botões de dados para visualizar uma tabela</div>
 	</div>
 
     </div>
 
-   <script>
-        function atualizarMensagem(mensagem) {
-            const status = document.getElementById('mensagemStatus');
-            status.innerText = mensagem;
-        }
+<div id="clientesContainer"></div>
+<div id="transacoesContainer"></div>
+<div id="campanhasContainer"></div>
 
-        function carregarImagem(nomeImagem) {
-            const container = document.getElementById('imagemContainer');
-            container.innerHTML = `<img src="${nomeImagem}" alt="${nomeImagem}">`;
-            document.getElementById('imagemStatus').style.display = 'none';
-        }
+<script>
+  const BASE_URL = window.location.origin;
 
-        function carregarCSV(nomeArquivo) {
-            fetch(nomeArquivo)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Erro ao carregar o arquivo CSV');
-                    }
-                    return response.text();
-                })
-                .then(data => {
-                    const linhas = data.split('\n').filter(l => l.trim() !== '');
-                    const tabela = document.createElement('table');
+  async function carregarCSV('clientes.csv', containerClientes, expectedHeaders) {
+    const container = document.getElementById(containerClientes);
+    try {
+      container.innerHTML = `<div class="status">Carregando ${'clientes.csv'}...</div>`;
 
-                    linhas.forEach((linha, index) => {
-                        const elementos = linha.split(',');
-                        const tr = document.createElement('tr');
+      const csvUrl = `${BASE_URL}/${'clientes.csv'}?t=${Date.now()}`;
+      const response = await fetch(csvUrl);
 
-                        elementos.forEach(el => {
-                            const celula = index === 0 ? document.createElement('th') : document.createElement('td');
-                            celula.textContent = el.trim();
-                            tr.appendChild(celula);
-                        });
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}: ${response.statusText}`);
+      }
+	    
+ async function carregarCSV('campanhas.csv', containerCampanhas, expectedHeaders) {
+    const container = document.getElementById(containerCampanhas);
+    try {
+      container.innerHTML = `<div class="status">Carregando ${'campanhas.csv'}...</div>`;
 
-                        tabela.appendChild(tr);
-                    });
+      const csvUrl = `${BASE_URL}/${'campanhas.csv'}?t=${Date.now()}`;
+      const response = await fetch(csvUrl);
 
-                    const container = document.getElementById('tabelaContainer');
-                    container.innerHTML = '';
-                    container.appendChild(tabela);
-                    atualizarMensagem(`✅ Dados de ${nomeArquivo.replace('.csv','')} carregados com sucesso.`);
-                })
-                .catch(error => {
-                    atualizarMensagem('❌ Erro ao carregar os dados.');
-                    console.error(error);
-                });
-        }
-    </script>
-</body>
-</html>
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}: ${response.statusText}`);
+      }
+
+ async function carregarCSV('transacoes.csv', containerTrasações, expectedHeaders) {
+    const container = document.getElementById(containerTransações);
+    try {
+      container.innerHTML = `<div class="status">Carregando ${'transacoes.csv'}...</div>`;
+
+      const csvUrl = `${BASE_URL}/${'transacoes.csv'}?t=${Date.now()}`;
+      const response = await fetch(csvUrl);
+
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}: ${response.statusText}`);
+      }
+	    
+      const buffer = await response.arrayBuffer();
+      const decoder = new TextDecoder('utf-8');
+      const csvData = decoder.decode(buffer).replace(/^\uFEFF/, '');
+
+      const linhas = csvData.split(/\r?\n/).filter(line => line.trim());
+      if (linhas.length < 2) throw new Error('CSV inválido');
+
+      const headers = linhas[0].split(',').map(h => h.trim());
+      if (!arraysIguais(headers, expectedHeaders)) {
+        throw new Error(`Cabeçalhos do CSV ${'clientes.csv'} não correspondem`);
+      }
+
+      const headers = linhas[0].split(',').map(h => h.trim());
+      if (!arraysIguais(headers, expectedHeaders)) {
+        throw new Error(`Cabeçalhos do CSV ${'campanhas.csv'} não correspondem`);
+      }
+
+      const headers = linhas[0].split(',').map(h => h.trim());
+      if (!arraysIguais(headers, expectedHeaders)) {
+        throw new Error(`Cabeçalhos do CSV ${'transacoes.csv'} não correspondem`);
+      }
+
+      const table = document.createElement('table');
+
+      const thead = table.createTHead();
+      const headerRow = thead.insertRow();
+      headers.forEach(header => {
+        const th = document.createElement('th');
+        th.textContent = header;
+        headerRow.appendChild(th);
+      });
+
+      const tbody = table.createTBody();
+      for (let i = 1; i < linhas.length; i++) {
+        const cells = linhas[i].split(',').map(c => c.trim());
+        if (cells.length !== headers.length) continue;
+
+        const row = tbody.insertRow();
+        cells.forEach((cell, index) => {
+          const td = row.insertCell();
+          td.innerHTML = formatarCelula(cell, headers[index]);
+        });
+      }
+
+      container.innerHTML = '';
+      container.appendChild(table);
+
+    } catch (error) {
+      console.error('Erro:', error);
+      container.innerHTML = `
+        <div class="erro">
+          <strong>Erro ao carregar dados:</strong> ${error.message}
+          <br><br>
+          <button onclick="location.reload()">↻ Tentar novamente</button>
+        </div>
+      `;
+    }
+  }
+
+  function formatarCelula(valor, cabecalho) {
+    try {
+      const formatadores = {
+        'cliente_id': v => `${v.padStart(4, '0')}`,
+        'idade': v => `${v} anos`,
+        'renda_mensal': v => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v),
+        'cidade': v => `${v}`,
+        'tipo_cliente': v => `${v}`,
+        'ultima_compra': v => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v),
+        'frequencia_compras': v => `${v} vezes`,
+        'total_gasto': v => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v),
+
+        'campanha_id': v => `${v.padStart(2, '0')}`,
+        'nome_campanha': v => `${v}`,
+        'custo_campanha': v => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v),
+        'alcance': v => new Intl.NumberFormat('pt-BR').format(v),
+        'conversao': v => new Intl.NumberFormat('pt-BR').format(valor),
+
+	'transacao_id': v => `${v.padStart(4, '0')}`, 
+	'cliente_id': v => `${v.padStart(4, '0')}`,
+        'data_compra': v => new Date(v).toLocaleDateString('pt-BR'),
+        'valor_compra': v => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v),
+        'meio_pagamento': v => `${v}`,
+        'campanha': v => `${v}`,
+      };
+      return formatadores[cabecalho]?.(valor) || valor;
+    } catch (error) {
+      return `<span style="color:red">${valor}</span>`;
+    }
+  }
+
+  function arraysIguais(a, b) {
+    return a.length === b.length && a.every((v, i) => v === b[i]);
+  }
+
+  // Funções específicas para cada CSV
+  function carregarClientes() {
+    carregarCSV('clientes.csv', 'clientesContainer', [
+      'cliente_id', 'idade', 'renda_mensal', 'cidade',
+      'tipo_cliente', 'ultima_compra',
+      'frequencia_compras', 'total_gasto'
+    ]);
+  }
+
+  function carregarCampanhas() {
+    carregarCSV('campanhas.csv', 'campanhasContainer', [
+      'campanha_id', 'nome_campanha', 'custo_campanha', 'alcance', 'conversao'
+    ]);
+  }
+
+  function carregarTransacoes() {
+    carregarCSV('transacoes.csv', 'transacoesContainer', [
+      'campanha_id', 'cliente_id', 'data_compra', 'valor_compra', 'meio_pagamento', 'campanha'
+    ]);
+  }
+
+  // Chamar as funções para carregar tudo ao carregar a página
+  window.onload = () => {
+    carregarClientes();
+    carregarCampanhas();
+    carregarTransacoes();
+  };
+</script>
